@@ -1,0 +1,8 @@
+spring:
+  application:
+    name: axin-agent-image-mcp-server
+  profiles:
+    active: stdio
+server:
+  port: 8127
+

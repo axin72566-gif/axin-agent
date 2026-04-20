@@ -1,0 +1,16 @@
+spring:
+  ai:
+    mcp:
+      server:
+        name: axin-agent-image-mcp-server
+        version: 0.0.1
+        type: SYNC
+        stdio: true
+  main:
+    web-application-type: none
+    banner-mode: off
+
+# stdio 模式：彻底关闭所有日志，防止污染 MCP 协议通道
+logging:
+  level:
+    root: OFF

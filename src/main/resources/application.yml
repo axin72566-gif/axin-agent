@@ -1,10 +1,31 @@
 spring:
   application:
     name: axin-agent
+  ai:
+    dashscope:
+      api-key: sk-06700e91df384f1f8a5eb8f708a8183d
+    vectorstore:
+      redis:
+        index-name: axin-agent
+        prefix: "axin-agent:"
+        initialize-schema: true
+    mcp:
+      client:
+        stdio:
+          servers-configuration: classpath:mcp-servers.json
+
+  data:
+    redis:
+      host: 192.168.60.131
+      port: 8321
+      database: 12
+      connect-timeout: 5000
+
 server:
   port: 8123
   servlet:
     context-path: /api
+
 # springdoc-openapi
 springdoc:
   swagger-ui:
@@ -17,8 +38,12 @@ springdoc:
     - group: 'default'
       paths-to-match: '/**'
       packages-to-scan: com.axin.axinagent.controller
+
 # knife4j
 knife4j:
   enable: true
   setting:
     language: zh_cn
+
+search-api:
+  api-key: zsmSBAyoiNHWVWGwUpT8LNNV
