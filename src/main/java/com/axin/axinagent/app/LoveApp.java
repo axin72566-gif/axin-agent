@@ -19,6 +19,7 @@ import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.tool.ToolCallback;
 import org.springframework.ai.tool.ToolCallbackProvider;
 import org.springframework.stereotype.Component;
+import reactor.core.publisher.Flux;
 
 import java.util.List;
 
@@ -152,6 +153,21 @@ public class LoveApp {
 				.chatResponse();
 		assert response != null;
 		return response.getResult().getOutput().getText();
+	}
+
+	/**
+	 * 流式聊天
+	 * @param message 输入
+	 * @param chatId 聊天id
+	 * @return 流式响应
+	 */
+	public Flux<String> doChatByStream(String message, String chatId) {
+		return chatClient
+				.prompt()
+				.user(message)
+				.advisors(spec -> spec.param(ChatMemory.CONVERSATION_ID, chatId))
+				.stream()
+				.content();
 	}
 
 //	/**

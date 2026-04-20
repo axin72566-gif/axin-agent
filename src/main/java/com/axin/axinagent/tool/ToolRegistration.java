@@ -17,10 +17,12 @@ public class ToolRegistration {
 		WebSearchTool webSearchTool = new WebSearchTool(searchApiKey);
 		WebScrapingTool webScrapingTool = new WebScrapingTool();
 		PDFGenerationTool pdfGenerationTool = new PDFGenerationTool();
+		TerminateTool terminateTool = new TerminateTool();
 		return ToolCallbacks.from(
 				webSearchTool,
 				webScrapingTool,
-				pdfGenerationTool
+				pdfGenerationTool,
+				terminateTool
 		);
 	}
 }
