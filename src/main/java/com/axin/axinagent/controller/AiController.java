@@ -6,7 +6,6 @@ import jakarta.annotation.Resource;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.tool.ToolCallback;
 import org.springframework.http.MediaType;
-import org.springframework.http.codec.ServerSentEvent;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -29,9 +28,10 @@ public class AiController {
 	private ChatModel dashscopeChatModel;
 
 	/**
-	 * 同步调用 LoveApp 进行聊天
+	 * 同步聊天
+	 *
 	 * @param message 用户消息
-	 * @param chatId 会话 ID
+	 * @param chatId  会话 ID
 	 * @return 模型回复
 	 */
 	@GetMapping("/love_app/chat/sync")
@@ -40,44 +40,29 @@ public class AiController {
 	}
 
 	/**
-	 * 异步调用 LoveApp 进行聊天，返回 Flux 数据流
+	 * 流式聊天（SSE，MediaType 方式）
+	 *
 	 * @param message 用户消息
-	 * @param chatId 会话 ID
-	 * @return Flux 数据流，包含模型回复的每条消息
+	 * @param chatId  会话 ID
+	 * @return Flux 文本流
 	 */
 	@GetMapping(value = "/love_app/chat/sse", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-	public Flux<String> doChatWithLoveAppSSEMediaType(String message, String chatId) {
+	public Flux<String> doChatWithLoveAppSSE(String message, String chatId) {
 		return loveApp.doChatByStream(message, chatId);
 	}
 
 	/**
-	 * 异步调用 LoveApp 进行聊天，返回 ServerSentEvent 数据流
+	 * 流式聊天（SseEmitter 方式，适合需要手动控制 SSE 生命周期的场景）
+	 *
 	 * @param message 用户消息
-	 * @param chatId 会话 ID
-	 * @return ServerSentEvent 数据流，包含模型回复的每条消息
-	 */
-	@GetMapping(value = "/love_app/chat/sse")
-	public Flux<ServerSentEvent<String>> doChatWithLoveAppSSEEvent(String message, String chatId) {
-		return loveApp.doChatByStream(message, chatId)
-				.map(chunk -> ServerSentEvent.<String>builder()
-						.data(chunk)
-						.build());
-	}
-
-	/**
-	 * 异步调用 LoveApp 进行聊天，返回 SseEmitter 数据流
-	 * @param message 用户消息
-	 * @param chatId 会话 ID
-	 * @return SseEmitter 数据流，用于实时接收模型回复的每条消息
+	 * @param chatId  会话 ID
+	 * @return SseEmitter 实例
 	 */
 	@GetMapping("/love_app/chat/sse/emitter")
 	public SseEmitter doChatWithLoveAppSseEmitter(String message, String chatId) {
-		// 创建一个超时时间较长的 SseEmitter
-		SseEmitter emitter = new SseEmitter(180000L); // 3分钟超时
-		// 获取 Flux 数据流并直接订阅
+		SseEmitter emitter = new SseEmitter(180_000L);
 		loveApp.doChatByStream(message, chatId)
 				.subscribe(
-						// 处理每条消息
 						chunk -> {
 							try {
 								emitter.send(chunk);
@@ -85,12 +70,9 @@ public class AiController {
 								emitter.completeWithError(e);
 							}
 						},
-						// 处理错误
 						emitter::completeWithError,
-						// 处理完成
 						emitter::complete
 				);
-		// 返回emitter
 		return emitter;
 	}
 
@@ -98,15 +80,12 @@ public class AiController {
 	 * 流式调用 Manus 超级智能体
 	 *
 	 * @param message 用户消息
-	 * @return SseEmitter 数据流，用于实时接收模型回复的每条消息
+	 * @return SseEmitter 实例
 	 */
 	@GetMapping("/manus/chat")
 	public SseEmitter doChatWithManus(String message) {
 		AxinManus axinManus = new AxinManus(allTools, dashscopeChatModel);
 		return axinManus.runStream(message);
 	}
-
-
-
 }
 

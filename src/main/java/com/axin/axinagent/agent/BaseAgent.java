@@ -15,65 +15,45 @@ import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
 /**
- * 抽象基础代理类，用于管理代理状态和执行流程。
- * 提供状态转换、内存管理和基于步骤的执行循环的基础功能。
- * 子类必须实现step方法。
+ * 抽象基础代理类，管理代理状态和执行流程。
+ * 提供状态转换、消息记忆管理和步骤循环的基础实现，子类须实现 {@link #step()} 方法。
  */
 @Data
 @Slf4j
 public abstract class BaseAgent {
 
-	// 核心属性
 	private String name;
-
-	// 提示
 	private String systemPrompt;
 	private String nextStepPrompt;
 
-	// 状态
 	private AgentState state = AgentState.IDLE;
 
-	// 执行控制
 	private int maxSteps = 10;
 	private int currentStep = 0;
 
-	// LLM
 	private ChatClient chatClient;
 
-	// Memory（需要自主维护会话上下文）
+	/** 自维护的会话消息上下文 */
 	private List<Message> messageList = new ArrayList<>();
 
 	/**
-	 * 运行代理
+	 * 同步运行代理，返回所有步骤结果的拼接字符串。
 	 *
 	 * @param userPrompt 用户提示词
-	 * @return 执行结果
+	 * @return 各步骤执行结果
 	 */
 	public String run(String userPrompt) {
-		if (this.state != AgentState.IDLE) {
-			throw new RuntimeException("Cannot run agent from state: " + this.state);
-		}
-		if (StrUtil.isBlank(userPrompt)) {
-			throw new RuntimeException("Cannot run agent with empty user prompt");
-		}
-		// 更改状态
+		validateBeforeRun(userPrompt);
 		state = AgentState.RUNNING;
-		// 记录消息上下文
 		messageList.add(new UserMessage(userPrompt));
-		// 保存结果列表
 		List<String> results = new ArrayList<>();
 		try {
 			for (int i = 0; i < maxSteps && state != AgentState.FINISHED; i++) {
-				int stepNumber = i + 1;
-				currentStep = stepNumber;
-				log.info("Executing step {}/{}", stepNumber, maxSteps);
-				// 单步执行
-				String stepResult = step();
-				String result = "Step " + stepNumber + ": " + stepResult;
-				results.add(result);
+				currentStep = i + 1;
+				log.info("Executing step {}/{}", currentStep, maxSteps);
+				results.add("Step " + currentStep + ": " + step());
 			}
-			// 检查是否超出步骤限制
-			if (currentStep >= maxSteps) {
+			if (state != AgentState.FINISHED) {
 				state = AgentState.FINISHED;
 				results.add("Terminated: Reached max steps (" + maxSteps + ")");
 			}
@@ -81,64 +61,53 @@ public abstract class BaseAgent {
 		} catch (Exception e) {
 			state = AgentState.ERROR;
 			log.error("Error executing agent", e);
-			return "执行错误" + e.getMessage();
+			return "执行错误: " + e.getMessage();
 		} finally {
-			// 清理资源
-			this.cleanup();
+			cleanup();
 		}
 	}
 
 	/**
-	 * 运行代理（流式输出）
+	 * 异步流式运行代理，通过 SSE 逐步推送每个步骤结果。
 	 *
 	 * @param userPrompt 用户提示词
-	 * @return SseEmitter实例
+	 * @return SseEmitter 实例（5分钟超时）
 	 */
 	public SseEmitter runStream(String userPrompt) {
-		// 1. 创建 SSE 发射器（5分钟超时）
-		SseEmitter emitter = new SseEmitter(300000L);
+		SseEmitter emitter = new SseEmitter(300_000L);
 
-		// 2. 异步执行（不阻塞主线程）
+		emitter.onTimeout(() -> {
+			state = AgentState.ERROR;
+			log.warn("SSE 连接超时");
+			emitter.complete();
+		});
+
+		emitter.onCompletion(() -> {
+			if (state == AgentState.RUNNING) {
+				state = AgentState.FINISHED;
+			}
+			log.info("SSE 连接已关闭");
+		});
+
 		CompletableFuture.runAsync(() -> {
 			try {
-				// 状态校验
-				if (this.state != AgentState.IDLE) {
-					sendSseMessage(emitter, "错误：无法从状态运行代理: " + this.state);
-					return;
-				}
+				validateBeforeRun(userPrompt);
+				state = AgentState.RUNNING;
+				messageList.add(new UserMessage(userPrompt));
 
-				// 参数校验
-				if (StrUtil.isBlank(userPrompt)) {
-					sendSseMessage(emitter, "错误：不能使用空提示词运行代理");
-					return;
-				}
-
-				// 初始化状态
-				this.state = AgentState.RUNNING;
-				this.messageList.add(new UserMessage(userPrompt));
-
-				// 循环执行步骤
-				for (int i = 0; i < maxSteps && this.state != AgentState.FINISHED; i++) {
+				for (int i = 0; i < maxSteps && state != AgentState.FINISHED; i++) {
 					currentStep = i + 1;
 					log.info("Executing step {}/{}", currentStep, maxSteps);
-
-					// 执行单步
-					String stepResult = step();
-					sendSseMessage(emitter, "Step " + currentStep + ": " + stepResult);
+					sendSseMessage(emitter, "Step " + currentStep + ": " + step());
 				}
 
-				// 结束判断
-				if (currentStep >= maxSteps) {
-					this.state = AgentState.FINISHED;
+				if (state != AgentState.FINISHED) {
+					state = AgentState.FINISHED;
 					sendSseMessage(emitter, "执行结束: 达到最大步骤 (" + maxSteps + ")");
 				}
-
-				// 正常完成
 				emitter.complete();
-
 			} catch (Exception e) {
-				// 异常处理
-				this.state = AgentState.ERROR;
+				state = AgentState.ERROR;
 				log.error("执行智能体失败", e);
 				try {
 					sendSseMessage(emitter, "执行错误: " + e.getMessage());
@@ -147,49 +116,41 @@ public abstract class BaseAgent {
 					emitter.completeWithError(ex);
 				}
 			} finally {
-				// 统一资源释放
-				this.cleanup();
+				cleanup();
 			}
-		});
-
-		// 3. 连接超时回调
-		emitter.onTimeout(() -> {
-			this.state = AgentState.ERROR;
-			log.warn("SSE 连接超时");
-			emitter.complete();
-		});
-
-		// 4. 连接关闭回调
-		emitter.onCompletion(() -> {
-			if (this.state == AgentState.RUNNING) {
-				this.state = AgentState.FINISHED;
-			}
-			log.info("SSE 连接已关闭");
 		});
 
 		return emitter;
 	}
 
 	/**
-	 * 发送标准 SSE 格式消息
-	 */
-	private void sendSseMessage(SseEmitter emitter, String message) throws IOException {
-		emitter.send(SseEmitter.event().data(message));
-	}
-
-
-	/**
-	 * 执行单个步骤
+	 * 执行单个步骤，由子类实现具体逻辑。
 	 *
 	 * @return 步骤执行结果
 	 */
 	public abstract String step();
 
 	/**
-	 * 清理资源
+	 * 运行前校验，状态非 IDLE 或提示词为空时抛出异常。
+	 */
+	private void validateBeforeRun(String userPrompt) {
+		if (state != AgentState.IDLE) {
+			throw new IllegalStateException("Cannot run agent from state: " + state);
+		}
+		if (StrUtil.isBlank(userPrompt)) {
+			throw new IllegalArgumentException("Cannot run agent with empty user prompt");
+		}
+	}
+
+	/** 发送标准 SSE 格式消息 */
+	private void sendSseMessage(SseEmitter emitter, String message) throws IOException {
+		emitter.send(SseEmitter.event().data(message));
+	}
+
+	/**
+	 * 清理资源，子类可重写。
 	 */
 	protected void cleanup() {
-		// 子类可以重写此方法来清理资源
 	}
 }
 

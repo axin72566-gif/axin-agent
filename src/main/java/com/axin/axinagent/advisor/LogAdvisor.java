@@ -11,43 +11,36 @@ import org.springframework.ai.chat.client.advisor.api.StreamAdvisorChain;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Flux;
 
+/**
+ * 日志 Advisor，记录每次请求的用户输入和 AI 响应（同步 + 流式）。
+ */
 @Component
 @Slf4j
 public class LogAdvisor implements CallAdvisor, StreamAdvisor {
 
 	@NotNull
 	@Override
-	public ChatClientResponse adviseCall(@NotNull ChatClientRequest chatClientRequest, @NotNull CallAdvisorChain callAdvisorChain) {
-		log.info("------------------------------------------LogAdvisor--------------------------------------------");
+	public ChatClientResponse adviseCall(@NotNull ChatClientRequest chatClientRequest,
+	                                     @NotNull CallAdvisorChain callAdvisorChain) {
+		log.info("------ LogAdvisor ------");
+		log.info("用户输入: {}", chatClientRequest.prompt().getUserMessage().getText());
 
-		// 1. 记录用户输入
-		String userMessage = chatClientRequest.prompt().getUserMessage().getText();
-		log.info("用户输入: {}", userMessage);
-
-		// 继续执行链，调用模型
 		ChatClientResponse response = callAdvisorChain.nextCall(chatClientRequest);
 
-		// 2. 记录 AI 响应
 		try {
-			String aiText = response.chatResponse().getResult().getOutput().getText();
-			log.info("AI 响应: {}", aiText);
+			log.info("AI 响应: {}", response.chatResponse().getResult().getOutput().getText());
 		} catch (Exception e) {
 			log.warn("LogAdvisor 记录响应异常: {}", e.getMessage());
 		}
-
 		return response;
 	}
 
 	@NotNull
 	@Override
-	public Flux<ChatClientResponse> adviseStream(@NotNull ChatClientRequest chatClientRequest, @NotNull StreamAdvisorChain streamAdvisorChain) {
-		log.info("------------------------------------------LogAdvisor (流式)--------------------------------------------");
-
-		// 1. 记录用户输入
-		String userMessage = chatClientRequest.prompt().getUserMessage().getText();
-		log.info("流式请求 - 用户输入: {}", userMessage);
-
-		// 5. 继续执行流式链
+	public Flux<ChatClientResponse> adviseStream(@NotNull ChatClientRequest chatClientRequest,
+	                                             @NotNull StreamAdvisorChain streamAdvisorChain) {
+		log.info("------ LogAdvisor (流式) ------");
+		log.info("流式请求 - 用户输入: {}", chatClientRequest.prompt().getUserMessage().getText());
 		return streamAdvisorChain.nextStream(chatClientRequest);
 	}
 

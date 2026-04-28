@@ -17,79 +17,85 @@ import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * 基于 Kryo 文件序列化的对话记忆实现。
+ * <p>Kryo 实例非线程安全，使用 {@link ThreadLocal} 确保每个线程独享一个实例。</p>
+ */
 @Slf4j
 public class FileBasedChatMemory implements ChatMemory {
 
-    private final String BASE_DIR;
-    private static final Kryo kryo = new Kryo();
+	private final String baseDir;
 
-    static {
-        kryo.setRegistrationRequired(false);
-        // 设置实例化策略
-        kryo.setInstantiatorStrategy(new StdInstantiatorStrategy());
-    }
+	/**
+	 * 每线程独享 Kryo 实例，避免并发序列化冲突。
+	 */
+	private static final ThreadLocal<Kryo> KRYO_THREAD_LOCAL = ThreadLocal.withInitial(() -> {
+		Kryo kryo = new Kryo();
+		kryo.setRegistrationRequired(false);
+		kryo.setInstantiatorStrategy(new StdInstantiatorStrategy());
+		return kryo;
+	});
 
-    // 构造对象时，指定文件保存目录
-    public FileBasedChatMemory(String dir) {
-        this.BASE_DIR = dir;
-        File baseDir = new File(dir);
-        if (!baseDir.exists()) {
-            try {
-                Files.createDirectories(baseDir.toPath());
-            } catch (IOException e) {
-                log.error("Failed to create base directory: {}", baseDir.getPath(), e);
-            }
-        }
-    }
+	public FileBasedChatMemory(String dir) {
+		this.baseDir = dir;
+		File baseDirFile = new File(dir);
+		if (!baseDirFile.exists()) {
+			try {
+				Files.createDirectories(baseDirFile.toPath());
+			} catch (IOException e) {
+				log.error("Failed to create base directory: {}", baseDirFile.getPath(), e);
+			}
+		}
+	}
 
-    @Override
-    public void add(@NotNull String conversationId, @NotNull List<Message> messages) {
-        List<Message> conversationMessages = getOrCreateConversation(conversationId);
-        conversationMessages.addAll(messages);
-        saveConversation(conversationId, conversationMessages);
-    }
+	@Override
+	public void add(@NotNull String conversationId, @NotNull List<Message> messages) {
+		List<Message> existing = getOrCreateConversation(conversationId);
+		existing.addAll(messages);
+		saveConversation(conversationId, existing);
+	}
 
-    @NotNull
-    @Override
-    public List<Message> get(@NotNull String conversationId) {
-	    return getOrCreateConversation(conversationId);
-    }
+	@NotNull
+	@Override
+	public List<Message> get(@NotNull String conversationId) {
+		return getOrCreateConversation(conversationId);
+	}
 
-    @Override
-    public void clear(@NotNull String conversationId) {
-        File file = getConversationFile(conversationId);
-        if (file.exists()) {
-            try {
-                Files.delete(file.toPath());
-            } catch (IOException e) {
-                log.error("Failed to delete conversation file: {}", file.getPath(), e);
-            }
-        }
-    }
+	@Override
+	public void clear(@NotNull String conversationId) {
+		File file = getConversationFile(conversationId);
+		if (file.exists()) {
+			try {
+				Files.delete(file.toPath());
+			} catch (IOException e) {
+				log.error("Failed to delete conversation file: {}", file.getPath(), e);
+			}
+		}
+	}
 
-    private List<Message> getOrCreateConversation(String conversationId) {
-        File file = getConversationFile(conversationId);
-        List<Message> messages = new ArrayList<>();
-        if (file.exists()) {
-            try (Input input = new Input(new FileInputStream(file))) {
-                messages = kryo.readObject(input, ArrayList.class);
-            } catch (IOException e) {
-                log.error("Failed to read conversation file: {}", file.getPath(), e);
-            }
-        }
-        return messages;
-    }
+	private List<Message> getOrCreateConversation(String conversationId) {
+		File file = getConversationFile(conversationId);
+		if (!file.exists()) {
+			return new ArrayList<>();
+		}
+		try (Input input = new Input(new FileInputStream(file))) {
+			return KRYO_THREAD_LOCAL.get().readObject(input, ArrayList.class);
+		} catch (IOException e) {
+			log.error("Failed to read conversation file: {}", file.getPath(), e);
+			return new ArrayList<>();
+		}
+	}
 
-    private void saveConversation(String conversationId, List<Message> messages) {
-        File file = getConversationFile(conversationId);
-        try (Output output = new Output(new FileOutputStream(file))) {
-            kryo.writeObject(output, messages);
-        } catch (IOException e) {
-            log.error("Failed to write conversation file: {}", file.getPath(), e);
-        }
-    }
+	private void saveConversation(String conversationId, List<Message> messages) {
+		File file = getConversationFile(conversationId);
+		try (Output output = new Output(new FileOutputStream(file))) {
+			KRYO_THREAD_LOCAL.get().writeObject(output, messages);
+		} catch (IOException e) {
+			log.error("Failed to write conversation file: {}", file.getPath(), e);
+		}
+	}
 
-    private File getConversationFile(String conversationId) {
-        return new File(BASE_DIR, conversationId + ".kryo");
-    }
+	private File getConversationFile(String conversationId) {
+		return new File(baseDir, conversationId + ".kryo");
+	}
 }
