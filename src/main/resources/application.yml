@@ -3,51 +3,17 @@ spring:
     name: axin-agent
   ai:
     dashscope:
-      api-key: sk-06700e91df384f1f8a5eb8f708a8183d
-    model:
-      embedding: dashscope
-    vectorstore:
-      redis:
-        index-name: axin-agent
-        prefix: "axin-agent:"
-        initialize-schema: true
+      api-key: ${DASHSCOPE_API_KEY:sk-06700e91df384f1f8a5eb8f708a8183d}
     mcp:
       client:
         stdio:
           servers-configuration: classpath:mcp-servers.json
-
-  data:
-    redis:
-      host: 192.168.60.131
-      port: 6379
-      database: 12
-      connect-timeout: 5000
-  datasource:
-    url: jdbc:mysql://192.168.60.131:3306/axin_agent?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai
-    username: root
-    password: kdkt1412@
-    driver-class-name: com.mysql.cj.jdbc.Driver
-  jpa:
-    hibernate:
-      ddl-auto: update
-    show-sql: true
-    properties:
-      hibernate:
-        dialect: org.hibernate.dialect.MySQL8Dialect
-  sql:
-    init:
-      mode: never
-
-mybatis-plus:
-  configuration:
-    map-underscore-to-camel-case: true
 
 server:
   port: 8123
   servlet:
     context-path: /api
 
-# springdoc-openapi
 springdoc:
   swagger-ui:
     path: /swagger-ui.html
@@ -60,27 +26,16 @@ springdoc:
       paths-to-match: '/**'
       packages-to-scan: com.axin.axinagent.controller
 
-# knife4j
 knife4j:
   enable: true
   setting:
     language: zh_cn
 
 search-api:
-  api-key: zsmSBAyoiNHWVWGwUpT8LNNV
+  api-key: ${SEARCH_API_KEY:zsmSBAyoiNHWVWGwUpT8LNNV}
 
-# 本地对象存储
 storage:
   root-path: ./tmp
-
-# RocketMQ 任务队列
-rocketmq:
-  name-server: 192.168.60.131:9876
-  producer:
-    group: axin-agent-producer
-    send-message-timeout: 3000
-  consumer:
-    group: axin-agent-consumer
 
 axin:
   model:
@@ -92,6 +47,3 @@ axin:
       model-name: qwen-turbo
       temperature: 0.3
       max-tokens: 2048
-  rag:
-    # 控制启动时是否初始化 RAG 向量数据，首次部署设为 true，后续可改为 false 跳过（已有数据时也会自动幂等跳过）
-    init-on-startup: true

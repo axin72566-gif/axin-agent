@@ -2,7 +2,6 @@ package com.axin.axinagent.agent;
 
 import cn.hutool.core.util.StrUtil;
 import com.axin.axinagent.agent.model.AgentState;
-import com.axin.axinagent.observability.TaskContext;
 import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
@@ -14,7 +13,6 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 
 /**
@@ -56,7 +54,6 @@ public abstract class BaseAgent {
      */
     public String run(String userPrompt) {
         validateBeforeRun(userPrompt);
-        bindTaskContextIfAbsent();
 
         state = AgentState.RUNNING;
         messageList.add(new UserMessage(userPrompt));
@@ -78,7 +75,6 @@ public abstract class BaseAgent {
             log.error("Error executing agent", e);
             return "执行错误: " + e.getMessage();
         } finally {
-            TaskContext.removeTaskId();
             cleanup();
         }
     }
@@ -91,7 +87,6 @@ public abstract class BaseAgent {
      */
     public SseEmitter runStream(String userPrompt) {
         SseEmitter emitter = new SseEmitter(300_000L);
-        String inheritedTaskId = TaskContext.getTaskId();
 
         emitter.onTimeout(() -> {
             state = AgentState.ERROR;
@@ -108,12 +103,6 @@ public abstract class BaseAgent {
 
         CompletableFuture.runAsync(() -> {
             try {
-                if (StrUtil.isNotBlank(inheritedTaskId)) {
-                    TaskContext.setTaskId(inheritedTaskId);
-                } else {
-                    TaskContext.setTaskId(UUID.randomUUID().toString().replace("-", ""));
-                }
-
                 validateBeforeRun(userPrompt);
                 state = AgentState.RUNNING;
                 messageList.add(new UserMessage(userPrompt));
@@ -140,7 +129,6 @@ public abstract class BaseAgent {
                     emitter.completeWithError(ex);
                 }
             } finally {
-                TaskContext.removeTaskId();
                 cleanup();
             }
         });
@@ -164,13 +152,6 @@ public abstract class BaseAgent {
         }
         if (StrUtil.isBlank(userPrompt)) {
             throw new IllegalArgumentException("Cannot run agent with empty user prompt");
-        }
-    }
-
-    private void bindTaskContextIfAbsent() {
-        String taskId = TaskContext.getTaskId();
-        if (StrUtil.isBlank(taskId)) {
-            TaskContext.setTaskId(UUID.randomUUID().toString().replace("-", ""));
         }
     }
 
