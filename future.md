@@ -175,8 +175,8 @@
 - **任务状态机**：`PENDING → RUNNING → PAUSED → DONE / FAILED / TIMEOUT`
 
 #### Agent 执行层
-- **规划器（Planner）**：先分解任务为有序子任务列表（当前 AxinManus 缺少此步骤）
-- **多 Agent 协作**：不同专长的 Agent 并行或串行协作
+- **规划器（Planner）**：先分解任务为有序子任务列表（当前 AxinManus 缺少此步骤）✅ **已实现 `PlannerAgent`**
+- **多 Agent 协作**：不同专长的 Agent 并行或串行协作 ✅ **已实现 `OrchestratorAgent` + `ResearchAgent` + `WriterAgent`**
 - **每个 Agent 内部**：ReAct / CoT / ToT 等推理策略（当前已实现 ReAct）
 
 #### 记忆层
@@ -235,7 +235,7 @@
 
 提升复杂任务处理能力：
 
-- [ ] **引入 Planning 层**
+- [ ] **引入 Planning 层** ✅ **已完成**
   - 在 `AxinManus.think()` 前增加任务分解步骤
   - 使用结构化输出（已有 `jsonschema-generator` 依赖）将大任务拆分为子任务列表
   - 按顺序/优先级执行子任务，支持依赖关系
@@ -245,13 +245,19 @@
   - 支持 `sessionId` 恢复，实现跨请求的"长任务"
   - Controller 层改为先查询 session，有则恢复，无则新建
 
-- [ ] **多 Agent 协作骨架**
+- [ ] **多 Agent 协作骨架** ✅ **已完成**
   - `OrchestratorAgent`：负责任务分发和结果汇总
   - `ResearchAgent`：专注搜索信息收集
   - `WriterAgent`：专注内容生成和输出
 
-- [ ] **工具扩展**
-  - 代码执行工具（沙箱环境，如 Docker 隔离）
+- [ ] **模型层（LLM 双模型）** ✅ **已完成**
+  - 新增 `ModelType` / `ModelRouter`，支持 `PRIMARY` 与 `LIGHT` 动态路由
+  - 新增 `ModelConfig` + `ModelProperties`，支持 `qwen-max` / `qwen-turbo` 双模型配置
+  - `PlannerAgent` 使用轻量模型（`LIGHT`）进行任务分解，执行层保持主力模型（`PRIMARY`）
+
+- [x] **工具扩展** ✅ **已完成**
+
+  - 代码执行工具（进程级沙箱，生产建议 Docker 隔离）
   - 文件系统工具（读/写/列出本地文件）
   - HTTP 请求工具（调用外部 REST API）
 
@@ -280,6 +286,13 @@
 | `agent/ReActAgent.java` | ReAct 模板方法，定义 think/act 抽象 |
 | `agent/ToolCallAgent.java` | 工具调用实现，手动执行 ToolCallingManager |
 | `agent/AxinManus.java` | 最终 Agent 实体，注册所有工具，最多 20 步 |
+| `agent/PlannerAgent.java` | ✅ 任务规划器，LLM 分解大任务为有序子任务列表（JSON 结构化输出） |
+| `agent/OrchestratorAgent.java` | ✅ 主控 Agent，协调多 Agent 按序执行，支持进度回调和依赖关系 |
+| `agent/ResearchAgent.java` | ✅ 信息收集 Agent，专注搜索/抓取/汇总，仅注册搜索类工具 |
+| `agent/WriterAgent.java` | ✅ 内容生成 Agent，专注写作/分析/PDF 输出，仅注册文件类工具 |
+| `agent/model/SubTask.java` | ✅ 子任务模型（order/title/description/agentRole/dependsOn） |
+| `agent/model/TaskPlan.java` | ✅ 任务计划模型（规划器结构化输出根对象） |
+| `agent/model/AgentRole.java` | ✅ Agent 角色枚举（RESEARCH / WRITER / MANUS） |
 | `app/LoveApp.java` | 恋爱顾问应用，集成 Memory + RAG + Tools |
 | `tool/WebSearchTool.java` | 网页搜索（⚠️ 有越界 Bug） |
 | `tool/WebScrapingTool.java` | 网页抓取（⚠️ 返回 HTML 耗 token） |
@@ -287,4 +300,7 @@
 | `chatmemory/FileBasedChatMemory.java` | Kryo 文件持久化记忆（⚠️ 未启用） |
 | `advisor/Re2Advisor.java` | Re2 提示增强 |
 | `rag/RagStrategyContext.java` | RAG 策略选择器（LOCAL/CLOUD） |
+| `task/AgentTaskConsumer.java` | ✅ RocketMQ 消费端，支持 SINGLE/MULTI 双模式执行 |
+| `task/AgentTaskService.java` | ✅ 任务提交/状态查询/取消/进度推送，支持 mode 参数 |
+| `config/RocketMqConfig.java` | RocketMQ + Redis Key 常量配置 |
 | `pom.xml` | 依赖管理（⚠️ font-asian scope=test） |

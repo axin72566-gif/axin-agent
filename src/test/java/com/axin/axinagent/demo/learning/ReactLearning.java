@@ -31,7 +31,7 @@ public class ReactLearning {
 				.interceptors(new ToolErrorInterceptor(), new GuardrailInterceptor())
 				.build();
 
-		AssistantMessage response = agent.call("请使用工具搜索“DashScope”");
+		AssistantMessage response = agent.call("请使用工具搜索"DashScope"");
 		System.out.println(response);
 	}
 }

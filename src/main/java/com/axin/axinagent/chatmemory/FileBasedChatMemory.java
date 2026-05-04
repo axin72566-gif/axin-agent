@@ -4,9 +4,8 @@ import com.esotericsoftware.kryo.Kryo;
 import com.esotericsoftware.kryo.io.Input;
 import com.esotericsoftware.kryo.io.Output;
 import lombok.extern.slf4j.Slf4j;
-import org.jetbrains.annotations.NotNull;
 import org.objenesis.strategy.StdInstantiatorStrategy;
-import org.springframework.ai.chat.memory.ChatMemory;
+import org.springframework.ai.chat.memory.ChatMemoryRepository;
 import org.springframework.ai.chat.messages.Message;
 
 import java.io.File;
@@ -15,14 +14,16 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
+import java.util.stream.Collectors;
 
 /**
- * 基于 Kryo 文件序列化的对话记忆实现。
+ * 基于 Kryo 文件序列化的对话记忆存储实现（实现 ChatMemoryRepository）。
  * <p>Kryo 实例非线程安全，使用 {@link ThreadLocal} 确保每个线程独享一个实例。</p>
  */
 @Slf4j
-public class FileBasedChatMemory implements ChatMemory {
+public class FileBasedChatMemory implements ChatMemoryRepository {
 
 	private final String baseDir;
 
@@ -49,31 +50,22 @@ public class FileBasedChatMemory implements ChatMemory {
 	}
 
 	@Override
-	public void add(@NotNull String conversationId, @NotNull List<Message> messages) {
-		List<Message> existing = getOrCreateConversation(conversationId);
-		existing.addAll(messages);
-		saveConversation(conversationId, existing);
-	}
-
-	@NotNull
-	@Override
-	public List<Message> get(@NotNull String conversationId) {
-		return getOrCreateConversation(conversationId);
-	}
-
-	@Override
-	public void clear(@NotNull String conversationId) {
-		File file = getConversationFile(conversationId);
-		if (file.exists()) {
-			try {
-				Files.delete(file.toPath());
-			} catch (IOException e) {
-				log.error("Failed to delete conversation file: {}", file.getPath(), e);
-			}
+	public List<String> findConversationIds() {
+		File dir = new File(baseDir);
+		if (!dir.exists() || !dir.isDirectory()) {
+			return new ArrayList<>();
 		}
+		File[] files = dir.listFiles((d, name) -> name.endsWith(".kryo"));
+		if (files == null) {
+			return new ArrayList<>();
+		}
+		return Arrays.stream(files)
+				.map(f -> f.getName().replace(".kryo", ""))
+				.collect(Collectors.toList());
 	}
 
-	private List<Message> getOrCreateConversation(String conversationId) {
+	@Override
+	public List<Message> findByConversationId(String conversationId) {
 		File file = getConversationFile(conversationId);
 		if (!file.exists()) {
 			return new ArrayList<>();
@@ -86,12 +78,25 @@ public class FileBasedChatMemory implements ChatMemory {
 		}
 	}
 
-	private void saveConversation(String conversationId, List<Message> messages) {
+	@Override
+	public void saveAll(String conversationId, List<Message> messages) {
 		File file = getConversationFile(conversationId);
 		try (Output output = new Output(new FileOutputStream(file))) {
 			KRYO_THREAD_LOCAL.get().writeObject(output, messages);
 		} catch (IOException e) {
 			log.error("Failed to write conversation file: {}", file.getPath(), e);
+		}
+	}
+
+	@Override
+	public void deleteByConversationId(String conversationId) {
+		File file = getConversationFile(conversationId);
+		if (file.exists()) {
+			try {
+				Files.delete(file.toPath());
+			} catch (IOException e) {
+				log.error("Failed to delete conversation file: {}", file.getPath(), e);
+			}
 		}
 	}
 

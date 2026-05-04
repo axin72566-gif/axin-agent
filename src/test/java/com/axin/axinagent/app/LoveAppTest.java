@@ -1,7 +1,7 @@
 package com.axin.axinagent.app;
 
 import cn.hutool.core.util.RandomUtil;
-import com.axin.axinagent.model.LoveReport;
+import com.axin.axinagent.app.model.LoveReport;
 import com.axin.axinagent.rag.RagStrategy;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;

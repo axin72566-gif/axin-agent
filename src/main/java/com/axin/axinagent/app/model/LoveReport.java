@@ -1,4 +1,4 @@
-package com.axin.axinagent.model;
+package com.axin.axinagent.app.model;
 
 import lombok.Data;
 

@@ -1,13 +1,16 @@
 package com.axin.axinagent.rag;
 
+import com.axin.axinagent.config.RagProperties;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.document.Document;
 import org.springframework.ai.reader.markdown.MarkdownDocumentReader;
 import org.springframework.ai.reader.markdown.config.MarkdownDocumentReaderConfig;
+import org.springframework.ai.vectorstore.SearchRequest;
 import org.springframework.ai.vectorstore.VectorStore;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.core.io.support.PathMatchingResourcePatternResolver;
 import org.springframework.stereotype.Component;
 
@@ -17,7 +20,9 @@ import java.util.List;
 /**
  * RAG 数据初始化器
  * 应用启动时将 resources/document/ 目录下所有 .md 文件按标题切分，
- * 每个 Markdown 标题段落（一个 Q&A）作为一个独立 chunk 写入 Redis Stack
+ * 每个 Markdown 标题段落（一个 Q&A）作为一个独立 chunk 写入 Redis Stack。
+ * <p>
+ * 可通过配置 axin.rag.init-on-startup=false 跳过初始化（已有数据时推荐关闭）。
  */
 @Component
 @Slf4j
@@ -25,10 +30,26 @@ import java.util.List;
 public class RagDataInitializer implements CommandLineRunner {
 
     @Resource
+    private RagProperties ragProperties;
+
+    @Resource
     private VectorStore vectorStore;
 
     @Override
     public void run(String... args) throws Exception {
+        if (!ragProperties.isInitOnStartup()) {
+            log.info("RAG 初始化已通过配置关闭");
+            return;
+        }
+        // 幂等检查：若向量库已有数据则跳过初始化，避免重复写入
+        List<Document> existing = vectorStore.similaritySearch(
+                SearchRequest.builder().query("恋爱").topK(1).build()
+        );
+        if (existing != null && !existing.isEmpty()) {
+            log.info("========== RAG 向量库已有数据，跳过初始化 ==========");
+            return;
+        }
+
         log.info("========== 开始初始化 RAG 数据（Redis 向量存储）==========");
 
         PathMatchingResourcePatternResolver resolver = new PathMatchingResourcePatternResolver();

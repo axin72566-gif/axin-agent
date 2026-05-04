@@ -2,7 +2,8 @@ package com.axin.axinagent.app;
 
 import com.axin.axinagent.advisor.LogAdvisor;
 import com.axin.axinagent.advisor.Re2Advisor;
-import com.axin.axinagent.model.LoveReport;
+import com.axin.axinagent.chatmemory.FileBasedChatMemory;
+import com.axin.axinagent.app.model.LoveReport;
 import com.axin.axinagent.rag.RagStrategy;
 import com.axin.axinagent.rag.RagStrategyContext;
 import jakarta.annotation.Resource;
@@ -11,7 +12,6 @@ import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.client.advisor.MessageChatMemoryAdvisor;
 import org.springframework.ai.chat.client.advisor.api.Advisor;
 import org.springframework.ai.chat.memory.ChatMemory;
-import org.springframework.ai.chat.memory.InMemoryChatMemoryRepository;
 import org.springframework.ai.chat.memory.MessageWindowChatMemory;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.tool.ToolCallback;
@@ -36,7 +36,7 @@ public class LoveApp {
 	@Resource
 	private RagStrategyContext ragStrategyContext;
 
-	@Resource
+	@Resource(name = "allTools")
 	private ToolCallback[] toolCallbacks;
 
 	@Resource
@@ -44,7 +44,7 @@ public class LoveApp {
 
 	public LoveApp(ChatModel dashScopeChatModel) {
 		ChatMemory chatMemory = MessageWindowChatMemory.builder()
-				.chatMemoryRepository(new InMemoryChatMemoryRepository())
+				.chatMemoryRepository(new FileBasedChatMemory("./chat-memory"))
 				.maxMessages(20)
 				.build();
 		chatClient = ChatClient.builder(dashScopeChatModel)

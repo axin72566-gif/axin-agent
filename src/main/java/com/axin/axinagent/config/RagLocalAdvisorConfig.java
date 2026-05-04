@@ -1,4 +1,4 @@
-package com.axin.axinagent.advisor;
+package com.axin.axinagent.config;
 
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.advisor.api.Advisor;
@@ -6,16 +6,18 @@ import org.springframework.ai.rag.advisor.RetrievalAugmentationAdvisor;
 import org.springframework.ai.rag.retrieval.search.VectorStoreDocumentRetriever;
 import org.springframework.ai.vectorstore.VectorStore;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 /**
- * 基于 Redis Stack 向量存储的本地 RAG Advisor
+ * 基于 Redis Stack 向量存储的本地 RAG Advisor 配置
  * 使用 VectorStoreDocumentRetriever 从 Redis 检索相似文档，增强 LLM 回答
  */
 @Slf4j
-@Configuration("loveAppRagLocalAdvisorConfig")
-public class LoveAppRagLocalAdvisor {
+@Configuration
+@EnableConfigurationProperties(RagProperties.class)
+public class RagLocalAdvisorConfig {
 
     @Bean
     @ConditionalOnBean(VectorStore.class)

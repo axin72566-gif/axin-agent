@@ -1,4 +1,4 @@
-package com.axin.axinagent.advisor;
+package com.axin.axinagent.config;
 
 import com.alibaba.cloud.ai.dashscope.api.DashScopeApi;
 import com.alibaba.cloud.ai.dashscope.rag.DashScopeDocumentRetriever;
@@ -11,9 +11,12 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
+/**
+ * 基于 DashScope 云端知识库的 RAG Advisor 配置
+ */
 @Slf4j
-@Configuration("loveAppRagCloudAdvisorConfig")
-public class LoveAppRagCloudAdvisor {
+@Configuration
+public class RagCloudAdvisorConfig {
 
 	@Value("${spring.ai.dashscope.api-key}")
 	private String dashScopeApiKey;
@@ -34,4 +37,3 @@ public class LoveAppRagCloudAdvisor {
 				.build();
 	}
 }
-
