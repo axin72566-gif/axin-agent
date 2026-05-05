@@ -28,7 +28,7 @@ import java.util.stream.Collectors;
 @Slf4j
 public class ToolCallAgent extends ReActAgent {
 
-    private static final String TERMINATE_TOOL_NAME = "terminateTool";
+    private static final String TERMINATE_TOOL_NAME = "doTerminate";
 
     private final ToolCallback[] availableTools;
     private final ToolCallingManager toolCallingManager;
@@ -41,7 +41,9 @@ public class ToolCallAgent extends ReActAgent {
         super();
         this.availableTools = availableTools;
         this.toolCallingManager = ToolCallingManager.builder().build();
-        this.chatOptions = DashScopeChatOptions.builder().build();
+        this.chatOptions = DashScopeChatOptions.builder()
+                .internalToolExecutionEnabled(false)
+                .build();
     }
 
     /**
@@ -59,27 +61,36 @@ public class ToolCallAgent extends ReActAgent {
         try {
             ChatResponse chatResponse = getChatClient().prompt(prompt)
                     .system(getSystemPrompt())
-                    .tools(availableTools)
+                    .toolCallbacks(availableTools)
                     .call()
                     .chatResponse();
 
             this.toolCallChatResponse = chatResponse;
-            AssistantMessage assistantMessage = chatResponse.getResult().getOutput();
-            List<AssistantMessage.ToolCall> toolCallList = assistantMessage.getToolCalls();
+	        AssistantMessage assistantMessage =null;
+	        if (chatResponse != null) {
+		        assistantMessage = chatResponse.getResult().getOutput();
+	        }
+	        List<AssistantMessage.ToolCall> toolCallList =null;
+	        if (assistantMessage != null) {
+		        toolCallList=assistantMessage.getToolCalls();
+	        }
 
-            log.info("{} 的思考: {}", getName(), truncate(assistantMessage.getText(), 200));
-            log.info("{} 选择了 {} 个工具", getName(), toolCallList.size());
+	        if (assistantMessage != null) {
+		        log.info("{} 的思考: {}", getName(), truncate(assistantMessage.getText()));
+	        }
+	        if (toolCallList != null) {
+		        log.info("{} 选择了 {} 个工具", getName(), toolCallList.size());
+	        }
 
-            if (!toolCallList.isEmpty()) {
-                String toolCallInfo = toolCallList.stream()
-                        .map(tc -> String.format("工具名称：%s，参数：%s", tc.name(), tc.arguments()))
-                        .collect(Collectors.joining("\n"));
-                log.info(toolCallInfo);
-                return true;
-            } else {
-                getMessageList().add(assistantMessage);
-                return false;
-            }
+	        if (toolCallList != null && !toolCallList.isEmpty()) {
+		        String toolCallInfo = toolCallList.stream()
+				        .map(tc -> String.format("工具名称：%s，参数：%s", tc.name(), tc.arguments()))
+				        .collect(Collectors.joining("\n"));
+		        log.info(toolCallInfo);
+		        return true;
+	        }
+	        getMessageList().add(assistantMessage);
+	        return false;
         } catch (Exception e) {
             log.error("{} 的思考过程遇到了问题: {}", getName(), e.getMessage());
             getMessageList().add(new AssistantMessage("处理时遇到错误: " + e.getMessage()));
@@ -124,13 +135,13 @@ public class ToolCallAgent extends ReActAgent {
         }
     }
 
-    private String truncate(String text, int maxLen) {
+    private String truncate(String text) {
         if (text == null) {
             return "";
         }
-        if (text.length() <= maxLen) {
+        if (text.length() <= 200) {
             return text;
         }
-        return text.substring(0, maxLen);
+        return text.substring(0, 200);
     }
 }

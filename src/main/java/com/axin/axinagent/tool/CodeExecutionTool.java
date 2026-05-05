@@ -3,6 +3,7 @@ package com.axin.axinagent.tool;
 import cn.hutool.core.io.FileUtil;
 import org.springframework.ai.tool.annotation.Tool;
 import org.springframework.ai.tool.annotation.ToolParam;
+import org.springframework.stereotype.Component;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -18,6 +19,7 @@ import java.util.concurrent.*;
  * <p>
  * 生产环境建议将执行能力迁移到 Docker / Firecracker 等隔离沙箱中，避免本地进程级执行风险。
  */
+@Component
 public class CodeExecutionTool {
 
 	private static final int TIMEOUT_SECONDS = 30;
@@ -85,7 +87,7 @@ public class CodeExecutionTool {
 			executor.shutdownNow();
 		}
 
-		String output = truncate(captureResult.output(), MAX_OUTPUT_LENGTH);
+		String output = truncate(captureResult.output());
 		if (captureResult.truncated()) {
 			output = output + "...(输出已截断)";
 		}
@@ -111,15 +113,15 @@ public class CodeExecutionTool {
 		return new CaptureResult(buffer.toString(StandardCharsets.UTF_8), truncated);
 	}
 
-	private String truncate(String text, int maxLength) {
+	private String truncate(String text) {
 		if (text == null) {
 			return "";
 		}
-		if (text.length() <= maxLength) {
+		if (text.length() <= MAX_OUTPUT_LENGTH) {
 			return text;
 		}
-		return text.substring(0, maxLength);
-	}
+		return text.substring(0, MAX_OUTPUT_LENGTH);
+		}
 
 	private record CaptureResult(String output, boolean truncated) {
 	}

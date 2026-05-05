@@ -34,9 +34,6 @@ knife4j:
 search-api:
   api-key: ${SEARCH_API_KEY:zsmSBAyoiNHWVWGwUpT8LNNV}
 
-storage:
-  root-path: ./tmp
-
 axin:
   model:
     primary:

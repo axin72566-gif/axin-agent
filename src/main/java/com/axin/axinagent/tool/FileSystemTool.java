@@ -3,8 +3,8 @@ package com.axin.axinagent.tool;
 import cn.hutool.core.io.FileUtil;
 import org.springframework.ai.tool.annotation.Tool;
 import org.springframework.ai.tool.annotation.ToolParam;
+import org.springframework.stereotype.Component;
 
-import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -12,6 +12,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.stream.Collectors;
 
+@Component
 public class FileSystemTool {
 
 	private static final int MAX_READ_LENGTH = 3000;
@@ -28,7 +29,7 @@ public class FileSystemTool {
 				return "File not found: " + targetPath;
 			}
 			String content = FileUtil.readUtf8String(targetPath.toFile());
-			return truncate(content, MAX_READ_LENGTH);
+			return truncate(content);
 		} catch (Exception e) {
 			return "Error reading file: " + e.getMessage();
 		}
@@ -68,8 +69,6 @@ public class FileSystemTool {
 						.collect(Collectors.toList());
 			}
 			return entries.isEmpty() ? "Directory is empty" : String.join("\n", entries);
-		} catch (IOException e) {
-			return "Error listing directory: " + e.getMessage();
 		} catch (Exception e) {
 			return "Error listing directory: " + e.getMessage();
 		}
@@ -89,13 +88,13 @@ public class FileSystemTool {
 		return resolvedPath;
 	}
 
-	private String truncate(String text, int maxLength) {
+	private String truncate(String text) {
 		if (text == null) {
 			return "";
 		}
-		if (text.length() <= maxLength) {
+		if (text.length() <= FileSystemTool.MAX_READ_LENGTH) {
 			return text;
 		}
-		return text.substring(0, maxLength) + "...(内容已截断)";
+		return text.substring(0, FileSystemTool.MAX_READ_LENGTH) + "...(内容已截断)";
 	}
 }

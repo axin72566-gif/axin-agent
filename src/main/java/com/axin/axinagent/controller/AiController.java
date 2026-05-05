@@ -31,17 +31,20 @@ public class AiController {
     @Resource
     private LogAdvisor logAdvisor;
 
+    @Resource
+    private InMemoryChatMemoryRepository chatMemoryRepository;
+
     /**
      * 同步聊天（带工具调用和会话记忆）。
      *
      * @param message 用户消息
-     * @param chatId  会话 ID（可选，不传则每次新建会话）
+     * @param chatId  会话 ID（可选）
      * @return AI 响应文本
      */
     @GetMapping("/chat/sync")
     public String chatSync(String message, String chatId) {
         ChatMemory chatMemory = MessageWindowChatMemory.builder()
-                .chatMemoryRepository(new InMemoryChatMemoryRepository())
+                .chatMemoryRepository(chatMemoryRepository)
                 .maxMessages(20)
                 .build();
 
@@ -55,7 +58,7 @@ public class AiController {
         String conversationId = chatId != null ? chatId : "default";
         return chatClient.prompt()
                 .user(message)
-                .tools(allTools)
+                .toolCallbacks(allTools)
                 .advisors(spec -> spec.param(ChatMemory.CONVERSATION_ID, conversationId))
                 .call()
                 .content();
@@ -71,7 +74,7 @@ public class AiController {
     @GetMapping(value = "/chat/sse", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public Flux<String> chatSse(String message, String chatId) {
         ChatMemory chatMemory = MessageWindowChatMemory.builder()
-                .chatMemoryRepository(new InMemoryChatMemoryRepository())
+                .chatMemoryRepository(chatMemoryRepository)
                 .maxMessages(20)
                 .build();
 
@@ -85,7 +88,7 @@ public class AiController {
         String conversationId = chatId != null ? chatId : "default";
         return chatClient.prompt()
                 .user(message)
-                .tools(allTools)
+                .toolCallbacks(allTools)
                 .advisors(spec -> spec.param(ChatMemory.CONVERSATION_ID, conversationId))
                 .stream()
                 .content();
@@ -96,15 +99,16 @@ public class AiController {
      * AxinManus 自主规划、使用工具、多步推理，每步结果实时推送。
      *
      * @param message 用户消息
+     * @param chatId  会话 ID（可选，用于标记会话归属）
      * @return SseEmitter 实例
      */
     @GetMapping("/agent/sse")
-    public SseEmitter agentSse(String message) {
+    public SseEmitter agentSse(String message, String chatId) {
         AxinManus axinManus = new AxinManus(
                 allTools,
                 modelRouter.get(ModelType.PRIMARY),
                 logAdvisor
         );
-        return axinManus.runStream(message);
+        return axinManus.runStream(message, chatId);
     }
 }

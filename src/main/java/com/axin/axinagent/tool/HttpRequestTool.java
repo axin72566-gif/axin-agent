@@ -4,10 +4,12 @@ import cn.hutool.http.HttpRequest;
 import cn.hutool.http.HttpResponse;
 import org.springframework.ai.tool.annotation.Tool;
 import org.springframework.ai.tool.annotation.ToolParam;
+import org.springframework.stereotype.Component;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
 
+@Component
 public class HttpRequestTool {
 
 	private static final int TIMEOUT_MS = 15000;
@@ -21,7 +23,7 @@ public class HttpRequestTool {
 			HttpRequest request = HttpRequest.get(url).timeout(TIMEOUT_MS);
 			applyHeaders(request, headers);
 			try (HttpResponse response = request.execute()) {
-				return truncate(response.body(), MAX_RESPONSE_LENGTH);
+				return truncate(response.body());
 			}
 		} catch (Exception e) {
 			return "HTTP GET error: " + e.getMessage();
@@ -40,7 +42,7 @@ public class HttpRequestTool {
 			applyHeaders(request, headers);
 			request.body(jsonBody == null ? "" : jsonBody);
 			try (HttpResponse response = request.execute()) {
-				return truncate(response.body(), MAX_RESPONSE_LENGTH);
+				return truncate(response.body());
 			}
 		} catch (Exception e) {
 			return "HTTP POST error: " + e.getMessage();
@@ -67,13 +69,13 @@ public class HttpRequestTool {
 		return headers;
 	}
 
-	private String truncate(String text, int maxLength) {
+	private String truncate(String text) {
 		if (text == null) {
 			return "";
 		}
-		if (text.length() <= maxLength) {
+		if (text.length() <= MAX_RESPONSE_LENGTH) {
 			return text;
 		}
-		return text.substring(0, maxLength) + "...(内容已截断)";
+		return text.substring(0, MAX_RESPONSE_LENGTH) + "...(内容已截断)";
 	}
 }

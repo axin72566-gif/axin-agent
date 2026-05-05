@@ -1,7 +1,9 @@
 package com.axin.axinagent.tool;
 
 import org.springframework.ai.tool.annotation.Tool;
+import org.springframework.stereotype.Component;
 
+@Component
 public class TerminateTool {
 
 	@Tool(description = """  

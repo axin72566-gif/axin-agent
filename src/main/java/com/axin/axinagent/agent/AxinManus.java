@@ -4,13 +4,14 @@ import com.axin.axinagent.advisor.LogAdvisor;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.tool.ToolCallback;
-import org.springframework.beans.factory.annotation.Qualifier;
-import org.springframework.stereotype.Component;
+
+import java.util.Objects;
+
 
 /**
  * 通用 AI Agent，整合所有可用工具，自主规划并完成复杂任务。
+ * 每次请求时由 AiController 手动实例化，保证会话状态隔离。
  */
-@Component
 public class AxinManus extends ToolCallAgent {
 
     private static final String SYSTEM_PROMPT = """
@@ -26,7 +27,7 @@ public class AxinManus extends ToolCallAgent {
             If you want to stop the interaction at any point, use the `terminate` tool/function call.
             """;
 
-    public AxinManus(@Qualifier("allTools") ToolCallback[] allTools,
+    public AxinManus(ToolCallback[] allTools,
                      ChatModel dashscopeChatModel,
                      LogAdvisor logAdvisor) {
         super(allTools);
@@ -36,11 +37,7 @@ public class AxinManus extends ToolCallAgent {
         setMaxSteps(20);
 
         ChatClient.Builder builder = ChatClient.builder(dashscopeChatModel);
-        if (logAdvisor != null) {
-            builder.defaultAdvisors(logAdvisor);
-        } else {
-            builder.defaultAdvisors(new LogAdvisor());
-        }
+	    builder.defaultAdvisors(Objects.requireNonNullElseGet(logAdvisor, LogAdvisor::new));
 
         setChatClient(builder.build());
     }

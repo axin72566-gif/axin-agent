@@ -83,14 +83,15 @@ public abstract class BaseAgent {
      * 异步流式运行代理，通过 SSE 逐步推送每个步骤结果。
      *
      * @param userPrompt 用户提示词
+     * @param chatId     会话标识（可选）
      * @return SseEmitter 实例（5分钟超时）
      */
-    public SseEmitter runStream(String userPrompt) {
+    public SseEmitter runStream(String userPrompt, String chatId) {
         SseEmitter emitter = new SseEmitter(300_000L);
 
         emitter.onTimeout(() -> {
             state = AgentState.ERROR;
-            log.warn("SSE 连接超时");
+            log.warn("SSE 连接超时, chatId={}", chatId);
             emitter.complete();
         });
 
@@ -98,7 +99,7 @@ public abstract class BaseAgent {
             if (state == AgentState.RUNNING) {
                 state = AgentState.FINISHED;
             }
-            log.info("SSE 连接已关闭");
+            log.info("SSE 连接已关闭, chatId={}", chatId);
         });
 
         CompletableFuture.runAsync(() -> {
@@ -109,7 +110,7 @@ public abstract class BaseAgent {
 
                 for (int i = 0; i < maxSteps && state != AgentState.FINISHED; i++) {
                     currentStep = i + 1;
-                    log.info("Executing step {}/{}", currentStep, maxSteps);
+                    log.info("Executing step {}/{}, chatId={}", currentStep, maxSteps, chatId);
                     trimMessageList();
                     sendSseMessage(emitter, "Step " + currentStep + ": " + step());
                 }
@@ -121,7 +122,7 @@ public abstract class BaseAgent {
                 emitter.complete();
             } catch (Exception e) {
                 state = AgentState.ERROR;
-                log.error("执行智能体失败", e);
+                log.error("执行智能体失败, chatId={}", chatId, e);
                 try {
                     sendSseMessage(emitter, "执行错误: " + e.getMessage());
                     emitter.complete();
@@ -168,7 +169,7 @@ public abstract class BaseAgent {
         if (messageList.size() <= maxMessageWindowSize) {
             return;
         }
-        Message firstMessage = messageList.get(0);
+        Message firstMessage = messageList.getFirst();
         boolean canSummarize = summarizeEnabled && chatClient != null && maxMessageWindowSize > 2;
         int tailSize = canSummarize ? maxMessageWindowSize - 2 : maxMessageWindowSize - 1;
         tailSize = Math.max(tailSize, 1);
@@ -192,13 +193,18 @@ public abstract class BaseAgent {
 
         if (messageList.size() > maxMessageWindowSize) {
             List<Message> compact = new ArrayList<>();
-            compact.add(messageList.get(0));
+            compact.add(messageList.getFirst());
             compact.addAll(messageList.subList(messageList.size() - (maxMessageWindowSize - 1), messageList.size()));
             messageList = compact;
         }
         log.info("消息列表已截断，当前保留 {} 条", messageList.size());
     }
 
+    /**
+     * 生成工作记忆摘要，控制长度在 500 字以内。
+     * @param removedMessages 被截断的消息列表
+     * @return 工作记忆摘要，控制在 500 字以内
+     */
     private String summarizeMessages(List<Message> removedMessages) {
         String history = removedMessages.stream()
                 .map(m -> m.getMessageType() + ": " + m.getText())
@@ -219,6 +225,12 @@ public abstract class BaseAgent {
         }
     }
 
+    /**
+     * 合并工作记忆摘要，控制在 500 字以内。
+     * @param oldSummary 旧摘要
+     * @param newSummary 新摘要
+     * @return 合并后的摘要，控制在 500 字以内
+     */
     private String mergeSummary(String oldSummary, String newSummary) {
         if (StrUtil.isBlank(oldSummary)) {
             return newSummary;

@@ -58,7 +58,7 @@ BaseAgent                  — State machine (IDLE→RUNNING→FINISHED/ERROR), 
 | `CodeExecutionTool` | Execute Python/JS code snippets |
 | `TerminateTool` | Agent signals task completion |
 
-MCP tools are loaded via `spring-ai-starter-mcp-client` from `classpath:mcp-servers.json` (Amap Maps + image search).
+MCP tools are loaded via `spring-ai-starter-mcp-client` from `classpath:mcp-servers.json` (Amap Maps).
 
 ### Chat Memory
 

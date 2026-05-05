@@ -1,7 +1,16 @@
 {
   "permissions": {
     "allow": [
-      "Bash(mvn clean *)"
+      "Bash(mvn clean *)",
+      "Bash(npm create *)",
+      "Read(//c/Program Files/**)",
+      "Read(//d/java/**)",
+      "Bash(npm install *)",
+      "Bash(npx tsc *)",
+      "Bash(npx vite *)",
+      "Bash(npm run *)",
+      "Bash(jar tf *)",
+      "Bash(mvn compile *)"
     ]
   }
 }
